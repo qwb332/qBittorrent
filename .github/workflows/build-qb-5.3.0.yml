@@ -1,0 +1,47 @@
+name: Build qBittorrent 5.3.0 Static (setMaxConnections)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-x86_64-musl:
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:edge
+    steps:
+      - name: Install base tools
+        run: |
+          apk add --no-cache bash curl git coreutils
+
+      - name: Checkout repo (contains patch)
+        uses: actions/checkout@v4
+
+      - name: Download userdocs/qbittorrent-nox-static script
+        run: |
+          curl -sL https://raw.githubusercontent.com/userdocs/qbittorrent-nox-static/master/qbittorrent-nox-static.sh -o qbittorrent-nox-static.sh
+          chmod +x qbittorrent-nox-static.sh
+
+      - name: Place custom setMaxConnections patch for 5.3.0
+        run: |
+          mkdir -p qbt-build/patches/qbittorrent/5.3.0
+          cp qbittorrent-5.3.0-custom/patch qbt-build/patches/qbittorrent/5.3.0/patch
+
+      - name: Build static x86_64 qbittorrent-nox (release-5.3.0)
+        env:
+          qbt_qbittorrent_tag: "release-5.3.0"
+          qbt_build_debug: "no"
+          qbt_cross_name: ""
+        run: |
+          bash qbittorrent-nox-static.sh all -b
+
+      - name: Verify binary
+        run: |
+          ls -lh qbt-build/completed/qbittorrent-nox
+          file qbt-build/completed/qbittorrent-nox || true
+          ./qbt-build/completed/qbittorrent-nox --version
+
+      - name: Upload x86_64-qbittorrent-nox artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x86_64-qbittorrent-nox-5.3.0-setMaxConnections
+          path: qbt-build/completed/qbittorrent-nox

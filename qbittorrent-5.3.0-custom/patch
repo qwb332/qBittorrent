@@ -1,0 +1,80 @@
+diff --git a/src/base/bittorrent/torrent.h b/src/base/bittorrent/torrent.h
+index 191b4e7..8deefcd 100644
+--- a/src/base/bittorrent/torrent.h
++++ b/src/base/bittorrent/torrent.h
+@@ -286,6 +286,7 @@ namespace BitTorrent
+         virtual void forceRecheck() = 0;
+         virtual void setUploadLimit(int limit) = 0;
+         virtual void setDownloadLimit(int limit) = 0;
++        virtual void setMaxConnections(int limit) = 0;
+         virtual void setSuperSeeding(bool enable) = 0;
+         virtual void setDHTDisabled(bool disable) = 0;
+         virtual void setPEXDisabled(bool disable) = 0;
+diff --git a/src/base/bittorrent/torrentimpl.cpp b/src/base/bittorrent/torrentimpl.cpp
+index 77d45ee..e0a0dc2 100644
+--- a/src/base/bittorrent/torrentimpl.cpp
++++ b/src/base/bittorrent/torrentimpl.cpp
+@@ -2763,6 +2763,17 @@ void TorrentImpl::setUploadLimit(const int limit)
+     deferredRequestResumeData();
+ }
+ 
++void TorrentImpl::setMaxConnections(const int limit)
++{
++    const int cleanValue = (limit <= 0) ? -1 : std::max(limit, 2);
++    try
++    {
++        m_nativeHandle.set_max_connections(cleanValue);
++        m_nativeStatus.connections_limit = cleanValue;
++    }
++    catch (const std::exception &) {}
++}
++
+ void TorrentImpl::setDownloadLimit(const int limit)
+ {
+     const int cleanValue = cleanLimitValue(limit);
+diff --git a/src/base/bittorrent/torrentimpl.h b/src/base/bittorrent/torrentimpl.h
+index 39b201e..3e73e5a 100644
+--- a/src/base/bittorrent/torrentimpl.h
++++ b/src/base/bittorrent/torrentimpl.h
+@@ -223,6 +223,7 @@ namespace BitTorrent
+         void prioritizeFiles(const QList<DownloadPriority> &priorities) override;
+         void setUploadLimit(int limit) override;
+         void setDownloadLimit(int limit) override;
++        void setMaxConnections(int limit) override;
+         void setSuperSeeding(bool enable) override;
+         void setDHTDisabled(bool disable) override;
+         void setPEXDisabled(bool disable) override;
+diff --git a/src/webui/api/torrentscontroller.cpp b/src/webui/api/torrentscontroller.cpp
+index e5c17d3..eefe732 100644
+--- a/src/webui/api/torrentscontroller.cpp
++++ b/src/webui/api/torrentscontroller.cpp
+@@ -1610,6 +1610,17 @@ void TorrentsController::setUploadLimitAction()
+     setResult(QString());
+ }
+ 
++void TorrentsController::setMaxConnectionsAction()
++{
++    requireParams({u"hashes"_s, u"limit"_s});
++
++    const int limit = params()[u"limit"_s].toInt();
++    const QStringList hashes {params()[u"hashes"_s].split(u'|')};
++    applyToTorrents(hashes, [limit](BitTorrent::Torrent *const torrent) { torrent->setMaxConnections(limit); });
++
++    setResult(QString());
++}
++
+ void TorrentsController::setDownloadLimitAction()
+ {
+     requireParams({u"hashes"_s, u"limit"_s});
+diff --git a/src/webui/api/torrentscontroller.h b/src/webui/api/torrentscontroller.h
+index 4eb102e..fd4bbe5 100644
+--- a/src/webui/api/torrentscontroller.h
++++ b/src/webui/api/torrentscontroller.h
+@@ -97,6 +97,7 @@ private slots:
+     void downloadLimitAction();
+     void setUploadLimitAction();
+     void setDownloadLimitAction();
++    void setMaxConnectionsAction();
+     void setShareLimitsAction();
+     void increasePrioAction();
+     void decreasePrioAction();
