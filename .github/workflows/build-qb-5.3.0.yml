@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Install base tools
         run: |
-          apk add --no-cache bash curl git coreutils
+          apk add --no-cache bash curl git coreutils file
 
       - name: Checkout repo (contains patch)
         uses: actions/checkout@v4
@@ -28,11 +28,11 @@ jobs:
 
       - name: Build static x86_64 qbittorrent-nox (release-5.3.0)
         env:
+          qbt_eula: "accept"
           qbt_qbittorrent_tag: "release-5.3.0"
           qbt_build_debug: "no"
-          qbt_cross_name: ""
         run: |
-          bash qbittorrent-nox-static.sh all -b
+          bash qbittorrent-nox-static.sh all
 
       - name: Verify binary
         run: |
